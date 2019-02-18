@@ -10,7 +10,7 @@
 --	REVISIONS:		(Date and Description)
 --				January 2005
 --				Modified the read loop to use fgets.
---				While loop is based on the buffer length 
+--				While loop is based on the buffer length
 --
 --
 --	DESIGNERS:		Aman Abdulla

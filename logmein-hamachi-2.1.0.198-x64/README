@@ -1,0 +1,483 @@
+LogMeIn Hamachi for Linux User Guide
+=====================================
+
+About LogMeIn Hamachi
+
+	LogMeIn Hamachi is a virtual networking service that can be set up in
+	minutes and enables secure remote access to your business network 
+	anywhere there is an Internet connection.
+
+	Unlike traditional hardware and software based VPN systems, LogMeIn
+	Hamachi is an on-demand virtual networking service that allows you to
+	focus your time and energy on providing the remote connections your 
+	users and systems need, and not the technology or infrastructure you 
+	are using to support them.
+
+	For more information, visit 
+	https://secure.logmein.com/US/products/hamachi2/
+
+	
+System Requirements
+
+	LogMeIn Hamachi only requires Internet connection and you must have LSB
+	version	3.0 or later installed.
+
+	
+Quick Start
+
+	To install LogMeIn Hamachi and join a network, do the following:
+
+	1. Depending on your distribution, install LogMeIn Hamachi as described in
+	   the Installation section.
+
+	2. Run 'hamachi login' to set the daemon online and to create an account.
+
+	3. Optionally, run 'hamachi set-nick <nickname>'. Unless you select a
+	   nickname, other Hamachi peers will see your client name as blank.
+
+	4. Run 'hamachi join <network id>' to join a network.
+
+	5. Run 'hamachi list' to list network members and their status.
+
+	
+Installation
+
+	The Hamachi Linux client comes as a single executable binary
+	(/opt/logmein-hamachi/bin/hamachid) compiled for the platform of your choice.
+	This binary includes the Hamachi daemon, the control application, and
+	the setup utility.
+
+	You can install LogMeIn Hamachi in multiple ways depending on your Linux
+	distribution. You can install LogMeIn Hamachi with RPM, DEB, and from a
+	compressed file. 
+
+
+	RPM installer
+
+	The RPM installer supports Linux distributions, such as
+	such as the Red Hat Enterprise Linux, the Fedora Project, SUSE Linux 
+	Enterprise, openSUSE, CentOS, and Mandriva Linux.
+
+	To install LogMeIn Hamachi with the RPM installer, run the following command
+	from the root account:
+
+		rpm -i <LogMeIn Hamachi RPM installation filename>
+
+	Optionally, you can double-click on the installation package to start the
+	installation process.
+
+
+	DEB installer
+
+	The DEB installer supports Linux distributions, such as Ubuntu, Elive, 
+	Linespire, and Knoppix.
+
+	To install LogMeIn Hamachi with the DEB installer, run the following command
+	from the root account:
+
+		dpkg -i <LogMeIn Hamachi DEB installation filename>
+
+
+	Compressed file installation
+
+	To install LogMeIn Hamachi from a compressed TGZ file, run the following
+	command from the root account:
+
+		./install.sh
+
+	
+Starting and Stopping the Hamachi Daemon Manually
+
+	After installation, LogMeIn Hamachi starts up as a background process
+	(daemon) automatically. However, if you want to change the configuration
+	of the Hamachi daemon, you can start and stop LogMeIn Hamachi manually
+	and then control this process from the command line. 
+	
+	To start the Hamachi daemon, run:
+
+		/etc/init.d/logmein-hamachi start
+
+	To stop the daemon manually, run:
+
+		/etc/init.d/logmein-hamachi stop
+
+	
+Starting the Hamachi Client
+
+	After the daemon is started, you can control the Hamachi client from the
+	command	line as follows:
+
+		hamachi [command]
+	
+	When you run the daemon for the first time, it stays offline. To change
+	its status to online, run:
+
+		hamachi login
+
+	To change its status back to offline, use:
+
+		hamachi logout
+
+	Running the Hamachi daemon without an argument displays the daemon's
+	status:
+
+		version    : 2.0.0.8
+		pid        : 956
+		status     : logging in
+		client id  : 087-125-763
+		address    : 5.50.1.2
+		nickname   : buddy
+		lmi account: buddy@net.com
+	
+	Note that the daemon remembers its state when it is shutdown with
+	the 'stop' command. So if its state was online, it will automatically
+	go online when started next time. If it was offline, it will stay
+	offline.
+	
+	
+Hamachi Client Commands
+
+	After you have logged in, you can list the available Hamachi operations
+	with the following command:
+		
+		hamachi -h
+	
+	The following network operations are available:
+	
+	set-nick <nickname>			Changes your nickname.
+	
+	login 					Changes the client's 
+						status to online.
+	
+	logout 					Changes the client's 
+						status to offline.
+	
+	list					Lists the networks and
+						their peers that you 
+						are a member of.
+	
+	peer					Lists the peer properties,
+						such as tunnel status and
+						authentication settings.
+	
+	network <network id>			Lists the details of the 
+						specified network.
+
+	create <network id> [<password>]	Creates a mesh network.
+	
+	set-pass <network id> [<password>]	Changes the password of
+						your network.
+	
+	set-access <network id>			Sets the access of networks
+	    [lock|unlock] [manual|auto]		of which you are admin or owner.
+
+	delete <network id>			Deletes your network.
+	
+	evict <network id> <client id>		Evicts a member from your
+						network.
+	approve <network id> <client id>	Approves the join request 
+						of a client to a network
+						created on your Hamachi
+						client.
+	
+	reject <network id> <client id>		Rejects the join request 
+						of a client to your network
+						created on your Hamachi
+						client.
+
+	join <network id> [<password>]		Joins a network.
+	
+	do-join <network id> [<password>]	Sends a join request to a
+						network that requires
+						manual approval.
+	
+	leave <network id>			Leaves a network.
+	
+	go-online <network id>			Goes online in a network.
+	
+	go-offline <network id>			Goes offline in a network.
+	
+	attach <LogMeIn account>		Attaches your client to a
+						LogMeIn account. 
+	
+	attach-net <LogMeIn account>		Attaches your client with
+						all the networks that you
+						have created to a LogMeIn
+						account.
+	
+	cancel					Cancels a pending attach
+						request.
+	
+	gw-config <network id>			Configures a gateway 
+						network. For details, see
+	    [dhcp|static 			Configuring Gateway
+		[net <start ip> <end ip> 	Networks.
+		 <netmask> <default gateway>]	
+		[domain <dns domain>]			
+		[dns <dns ip 1> [<dns ip 2>]]		
+	    [del <remote subnet CIDR> ...]	Removes a remote network
+						from a gateway network.
+	    [add <remote subnet CIDR> ...]	Adds a remote network to
+						a gateway network.
+
+	check-update				Checks if Hamachi client
+						updates are available.
+
+
+	For detailed description of the Hamachi client commands, see the
+	following sections.
+	
+	
+Joining Hamachi Networks
+
+	You can join networks using the 'hamachi join' command. You will be 
+	prompted for the password if it is not specified with the command.
+
+	To join a network that requires manual approval of the owner, use the 
+	'hamachi do-join' command.
+	
+	
+Creating and Managing Your Hamachi Networks
+	
+	You can also create your own networks using the 'hamachi create' command.
+	You will become an owner of any network that you create and only you
+	will be able to delete these networks with the 'hamachi delete' command.
+	
+	With the 'hamachi evict' command, you can remove unwanted members from 
+	the networks that you own.
+	
+	Note that you will stay online in the network after you create or
+	join it. To go offline in the network, use the 'hamachi go-online' 
+	command.
+
+	Two other commands, 'hamachi go-offline' and 'hamachi leave', reverse
+	the effect of the 'hamachi go-online' and 'hamachi join' commands 
+	respectively.
+
+	Note that the daemon remembers your network state. If you logout or 
+	shutdown the daemon while being online in a network, the daemon will 
+	automatically put you back online in the network on the next logon.
+	
+
+Attaching Your Client and Networks to a LogMeIn	Account
+
+	You can attach your client to a LogMeIn	Account with the 'hamachi attach'
+	command. This command sends an attach request to the LogMeIn account
+	holder who must approve or reject your request. Until the LogMeIn account
+	holder sends a response, you can cancel your request with the 'hamachi
+	cancel' command. 
+	
+	If you want to attach your client with all the networks that you have 
+	created on the client, use the 'hamachi attach-net' command.
+	
+	
+Listing Peers
+
+	To view the list of all networks and their members, run:
+
+		hamachi list
+
+	Network IDs are enclosed in square brackets and the network names are in 
+	apostrophes. For gateway networks, the IP of the Hamachi network adapter
+	and network mask is also displayed. The asterisk (*) in front of the 
+	network name means that you are online in that network:
+
+	* [023-715-571]  'abcde'
+	* [system.gw]		 [192.168.4.3/24]
+	    091-123-894  george  5.11.12.2
+	* [homelan]   
+	  * 087-455-651  chris   5.10.0.15    direct      UDP    65.49.88.5:7650
+	  x 095-157-685  ronny   5.10.0.16    direct      UDP    45.234.5.1:1045
+	    095-571-486  jane    5.10.0.17    direct      UDP    97.34.3.7:3450
+	  * 096-654-987  jill    5.10.0.18    via-relay   UDP    144.6.89.12:5100
+      
+	Under the network name, there is a peer list. Online peers will have
+	their IP address prefixed by an asterisk (*) or an (x). 
+
+	(*) means that the tunnel to the peer is either being established or
+	    ready. In the latter case, the peer's tunnel address is shown 
+	    on the right side of the list.
+
+	(x) means that the peer in unreachable, because the mediation server 
+	    either failed or is still trying to establish p2p tunnel between you
+	    and the peer.
+
+	The first column of the peer list contains the nine-digit peer client ID.
+	
+	The second column contains the nickname of the peer.
+	
+	The IP address in the third column denotes the Hamachi IP address of the
+	peer that is used to connect to other peers.
+
+	The connection type of the peer is marked in the next column as follows:
+
+	direct:      Other peers can make direct peer-to-peer connection, which is 
+		     the fastest connection type.
+	via-relay:   There is no direct connection between peers. Instead, peers 
+		     connect to the dedicated relay server that handles connection
+		     and transfers packages to the peers.
+	via-server:  Peers cannot establish connections to relay servers and
+		     therefore packages are transferred via the server connection. 
+		     This is the slowest connection type.
+
+	The next column indicates whether the peer can establish UDP or TCP 
+	connection.
+
+	The last column contains the physical IP address of the peer (if known)
+	that Hamachi uses to establish connection between the peer and the
+	Hamachi network adapter.
+
+
+
+Listing Peer Properties
+	
+	To list peer properties, enter the following command:
+
+		hamachi peer <client id>
+
+	You see the following list of peer properties:
+
+		client id  : 087-455-651
+		nickname   : chris
+		connection : direct
+	
+		authentication : completed
+		encryption     : enabled
+		compression    : disabled
+		VPN status     : ok
+		address        : 65.49.88.5
+	
+		via server  ok       TCP  n/a  
+	      * direct      ok       UDP  192.168.2.123:61200
+
+	These peer properties contain similar information to those that you see 
+	in the peer list. The 'VPN status' field denotes whether the Hamachi
+	virtual adapter is configured correctly, while the 'address' field 
+	contains the Hamachi virtual IP address of the Hamachi peer. The
+	'direct' line contains the physical IP address of the Hamachi peer.
+
+	The last two lines show the connection to the peer. The active connection 
+	is marked with an asterisk.
+
+
+Listing Network Properties
+
+	To get detailed information about a specific network, enter the following
+	command:
+
+		hamachi network <network id>
+
+	You see the following list of network properties:
+
+		id       : 091-123-894
+		name     : abcde
+		type     : Gateway
+
+		VPN status  : ok
+		IP address  : 192.168.1.33/22
+
+		config      : static
+		start ip    : 192.168.84.1
+		end ip      : 192.168.84.254
+		netmask     : 255.255.255.0
+		def gateway : 192.168.84.1
+		domain      : home.hamachi
+		dns server  : 192.168.84.1
+		            : 192.168.84.2
+		remote net  : 192.168.20.0/22
+		            : 192.168.200.0/22
+
+
+	Network properties contain similar information to peer properties. The 
+	network type can be Mesh, Hub-and-Spoke, and Gateway. If the network is 
+	of gateway type and has static configuration, additional information is 
+	also displayed about start and end IP range, DNS servers, remote 
+	networks, the default gateway and domain name. Gateway networks with 
+	DHCP configuration do not contain additional information.
+
+	For those networks that were created on the client, an 'Owner' field is
+	also displayed. This field contains the client ID of the owner of the 
+	network.
+
+
+Changing Nicknames
+	
+	You can change your own nickname with the 'hamachi set-nick' 
+	command when you are online.
+
+
+Changing Network Passwords
+
+	To change the password of a mesh network that you created enter the
+	following command:
+
+		hamachi set-pass <network id> [<password>]
+
+	There are no password strength requirements in LogMeIn Hamachi.
+
+
+Managing Network Access
+
+	To set the access of a network that you have created on the Hamachi
+	client, enter the following command:
+
+		hamachi set-access <network id> [lock|unlock] [manual|auto]
+
+	To prevent clients from joining your network, use the 'lock' 
+	option:
+
+		hamachi set-access 023-715-571 lock
+	
+	In this case, join reqests will be automatically rejected.
+
+	To enable new members to join your network, use the unlock option 
+	on a locked network. This is the default setting, therefore all new 
+	networks can accept new members.
+
+	To approve the join request of new members, you can choose manual and 
+	automatic approval:
+
+		hamachi set-access 023-715-571 manual
+
+	Clients that are waiting for manual approval to join your network are
+	listed with a question mark (?) in front of the client ID.
+
+	To accept a join request, you must define the client that you want to 
+	accept and the network that the client wants to join to:
+
+		hamachi approve <network id> <client id>
+
+
+Configuring Gateway Networks
+
+	To configure a gateway network, you must set the method of distributing
+	member IP addresses. The network can either use a DHCP server for 
+	assigning IP address automatically or can assign static IP addresses 
+	from a pool to the members. Using static configuration is recommended 
+	for gateway networks with no DHCP server.
+
+	For networks using a DHCP server, you do not have to 
+	configure an IP range, domain name, or DNS server IP addresses.
+	For networks using static configuration, you must set network
+	parameters with the following in mind:
+
+		- [net <start ip> <end ip> <netmask> <default gateway>] are 
+		  mandatory network parameters.
+		
+		- The domain and DNS parameters are optional. You can change 
+		  these later without defining the mandatory network parameters
+		  again.
+		
+		- You can define a maximum of two DNS servers.
+
+	You can add network subnets that are connected to this LAN. Other 
+	Hamachi clients will be able to access these subnets via your Hamachi 
+	gateway	client. You can add and remove an unlimited number 
+	of network subnets to your gateway client with the 'gw-config add' 
+	and 'gw-config del' commands:
+
+		gw-config 054-234-456 add 192.168.200.0/22
+
+
+==================================================================================
+Copyright © 2013 LogMeIn, Inc. All rights reserved.

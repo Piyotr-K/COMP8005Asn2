@@ -1,0 +1,62 @@
+What's new in Hamachi 2?
+
+Web Management Interface
+
+Centralized management is well-known for other LogMeIn products, but
+is a new concept for Hamachi. This radically changes the way the users 
+can handle their virtual networks and we all know the benefits of it. 
+Our aim is to gently push our current user base towards this new 
+approach of network management and we do it two ways: 1) we keep 
+supporting the old-fashined Hamachi mode (unattached) so we do not 
+force our users to attach their clients to a web account and 2) we 
+deliver the nice new features only with web management interface.
+The web management interface of Hamachi is tightly integrated with 
+LMI, so we can expect that our users will more likely start to use 
+other LogMeIn products as well.
+
+
+New network types
+
+Hamachi used only one network topology, where every member is connected
+to every other member (Mesh). We introduced two new network types 
+mainly targeted for corporate users: 
+Hub-and-Spoke: Only hubs are connected to every other member, spokes 
+have connection to only hubs. This topology is typical in a corporate 
+environment, where only server computers (hubs) have to be accessible 
+for a typical workstation (spoke). 
+
+Gateway: There is only one dedicated server (gateway) that opens up the 
+entire corporate network to roaming members in a secure way. These 
+roaming members are typically travelling agents or company managers 
+with laptops, who should be able to access the company network 
+resources from a downtown hotspot or from an airport, for instance.
+
+
+Corporate oriented policies
+
+From the web management interface you can apply strict rules on your 
+Hamachi network members. You can allow them to access the user 
+interface of their Hamachi client installed on their computer (full 
+mode). Or you can have total control over them through the web 
+management interface by switching them to view-only (restricted) or 
+hidden (tiny) modes.
+
+
+Reports
+
+For a corporate user or IT-professional it might be relevant to monitor 
+network activities. Who is online and when, who generates too big or 
+too small traffic, etc.
+
+
+Other familiar LMI features
+
+Profiles: The well-known profiles can be used with Hamachi. You can 
+share your networks and clients with other web management accounts 
+easily and set their privileges. 
+Install Links: You can invite anyone to your Hamachi networks by 
+sending an installation link via e-mail. -
+"My Networks" page: You can browse and access functions of your 
+networks and clients similarly to what you do with your computers on 
+the My Computers page
+
