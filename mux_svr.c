@@ -17,7 +17,7 @@
 --	DESIGNERS:		Based on Richard Stevens Example, p165-166
 --				Modified & redesigned: Aman Abdulla: February 16, 2001
 --
---				
+--
 --	PROGRAMMER:		Aman Abdulla
 --
 --	NOTES:
@@ -34,7 +34,7 @@
 #include <unistd.h>
 
 #define SERVER_TCP_PORT 7000	// Default port
-#define BUFLEN	255		//Buffer length
+#define BUFLEN	80		//Buffer length
 #define TRUE	1
 #define LISTENQ	5
 #define MAXLINE 4096
@@ -67,7 +67,7 @@ int main (int argc, char **argv)
 	// Create a stream socket
 	if ((listen_sd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 		SystemFatal("Cannot Create Socket!");
-	
+
 	// set SO_REUSEADDR so port can be resused imemediately after exit, i.e., after CTRL-c
         arg = 1;
         if (setsockopt (listen_sd, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) == -1)
@@ -81,7 +81,7 @@ int main (int argc, char **argv)
 
 	if (bind(listen_sd, (struct sockaddr *)&server, sizeof(server)) == -1)
 		SystemFatal("bind error");
-	
+
 	// Listen for connections
 	// queue up to LISTENQ connect requests
 	listen(listen_sd, LISTENQ);
@@ -105,7 +105,7 @@ int main (int argc, char **argv)
 			client_len = sizeof(client_addr);
 			if ((new_sd = accept(listen_sd, (struct sockaddr *) &client_addr, &client_len)) == -1)
 				SystemFatal("accept error");
-			
+
                         printf(" Remote Address:  %s\n", inet_ntoa(client_addr.sin_addr));
 
                         for (i = 0; i < FD_SETSIZE; i++)
@@ -133,32 +133,33 @@ int main (int argc, char **argv)
 
 		for (i = 0; i <= maxi; i++)	// check all clients for data
      		{
-			if ((sockfd = client[i]) < 0)
-				continue;
+					if ((sockfd = client[i]) < 0)
+						continue;
 
-			if (FD_ISSET(sockfd, &rset))
-         		{
-         			bp = buf;
-				bytes_to_read = BUFLEN;
-				while ((n = read(sockfd, bp, bytes_to_read)) > 0)
-				{
-					bp += n;
-					bytes_to_read -= n;
-				}
-				write(sockfd, buf, BUFLEN);   // echo to client
-				
-				if (n == 0) // connection closed by client
-            			{
-					printf(" Remote Address:  %s closed connection\n", inet_ntoa(client_addr.sin_addr));
-					close(sockfd);
-					FD_CLR(sockfd, &allset);
-               				client[i] = -1;
-            			}
-									            				
-				if (--nready <= 0)
-            				break;        // no more readable descriptors
-			}
-     		 }
+					if (FD_ISSET(sockfd, &rset))
+		     		{
+		     			bp = buf;
+							bytes_to_read = BUFLEN;
+							while ((n = read(sockfd, bp, bytes_to_read)) > 0)
+							{
+								bp += n;
+								bytes_to_read -= n;
+							}
+							write(sockfd, buf, BUFLEN);   // echo to client
+
+						//Connection should be closed when reaching EOF instead of when text is done being sent
+						if (n == 0) // connection closed by client
+        			{
+								// printf(" Remote Address:  %s closed connection\n", inet_ntoa(client_addr.sin_addr));
+								// close(sockfd);
+								// FD_CLR(sockfd, &allset);
+         				// client[i] = -1;
+        			}
+
+							if (--nready <= 0)
+        				break;        // no more readable descriptors
+						}
+   		 }
    	}
 	return(0);
 }
