@@ -40,7 +40,7 @@
 void *ClntConnection(void *data);
 
 #define SERVER_TCP_PORT 7000 // Default port
-#define BUFLEN 255           // Buffer length
+#define BUFLEN 80           // Buffer length
 
 //Struct
 struct ConArgs
@@ -93,11 +93,12 @@ int main(int argc, char **argv)
     //Create # of clients
     for (i = 0; i < numOfThreads; i++)
     {
+        sleep(0.1);
         pthread_create(&threadList[i], NULL, ClntConnection, (void *)argPT);
     }
 
     //Let main function finish when all threads finish
-    for (i = 0; i < numOfThreads; i++) 
+    for (i = 0; i < numOfThreads; i++)
     {
         pthread_join(threadList[i], NULL);
     }
@@ -197,5 +198,6 @@ void *ClntConnection(void *data)
     //Properly close file when finished
     fclose(fp);
     close(sd);
+    // printf("%d done\n", pthread_self());
     return NULL;
 }

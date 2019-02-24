@@ -2,7 +2,7 @@
 --	SOURCE FILE:		epoll_svr.c -   A simple echo server using the epoll API
 --
 --	PROGRAM:		epolls
---				gcc -Wall -ggdb -o epolls epoll_svr.c  
+--				gcc -Wall -ggdb -o epolls epoll_svr.c
 --
 --	FUNCTIONS:		Berkeley Socket API
 --
@@ -19,7 +19,7 @@
 --	The program will accept TCP connections from client machines.
 -- 	The program will read data from the client socket and simply echo it back.
 --	Design is a simple, single-threaded server using non-blocking, edge-triggered
---	I/O to handle simultaneous inbound connections. 
+--	I/O to handle simultaneous inbound connections.
 --	Test with accompanying client application: epoll_clnt.c
 ---------------------------------------------------------------------------------------*/
 
@@ -39,12 +39,13 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <signal.h>
+#include <pthread.h>
 
 #define TRUE 		1
 #define FALSE 		0
 #define EPOLL_QUEUE_LEN	256
 #define BUFLEN		80
-#define SERVER_PORT	7000
+#define SERVER_PORT	7001
 
 //Globals
 int fd_server;
@@ -54,16 +55,17 @@ static void SystemFatal (const char* message);
 static int ClearSocket (int fd);
 void close_fd (int);
 
-int main (int argc, char* argv[]) 
+int main (int argc, char* argv[])
 {
-	int i, arg; 
+	int i, arg;
 	int num_fds, fd_new, epoll_fd;
-	static struct epoll_event events[EPOLL_QUEUE_LEN], event;
+	static struct epoll_event events[EPOLL_QUEUE_LEN], event, emptyEvent;
 	int port = SERVER_PORT;
 	struct sockaddr_in addr, remote_addr;
 	socklen_t addr_size = sizeof(struct sockaddr_in);
 	struct sigaction act;
-	
+    pthread_t threadList[EPOLL_QUEUE_LEN];
+
 	// set up the signal handler to close the server socket when CTRL-c is received
         act.sa_handler = close_fd;
         act.sa_flags = 0;
@@ -72,112 +74,176 @@ int main (int argc, char* argv[])
                 perror ("Failed to set SIGINT handler");
                 exit (EXIT_FAILURE);
         }
-	
+
 	// Create the listening socket
 	fd_server = socket (AF_INET, SOCK_STREAM, 0);
-    	if (fd_server == -1) 
+    	if (fd_server == -1)
 		SystemFatal("socket");
-    	
+
     	// set SO_REUSEADDR so port can be resused imemediately after exit, i.e., after CTRL-c
     	arg = 1;
-    	if (setsockopt (fd_server, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) == -1) 
+    	if (setsockopt (fd_server, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) == -1)
 		SystemFatal("setsockopt");
-    	
+
     	// Make the server listening socket non-blocking
-    	if (fcntl (fd_server, F_SETFL, O_NONBLOCK | fcntl (fd_server, F_GETFL, 0)) == -1) 
+    	if (fcntl (fd_server, F_SETFL, O_NONBLOCK | fcntl (fd_server, F_GETFL, 0)) == -1)
 		SystemFatal("fcntl");
-    	
+
     	// Bind to the specified listening port
     	memset (&addr, 0, sizeof (struct sockaddr_in));
     	addr.sin_family = AF_INET;
     	addr.sin_addr.s_addr = htonl(INADDR_ANY);
     	addr.sin_port = htons(port);
-    	if (bind (fd_server, (struct sockaddr*) &addr, sizeof(addr)) == -1) 
+    	if (bind (fd_server, (struct sockaddr*) &addr, sizeof(addr)) == -1)
 		SystemFatal("bind");
-    	
+
     	// Listen for fd_news; SOMAXCONN is 128 by default
-    	if (listen (fd_server, SOMAXCONN) == -1) 
+    	if (listen (fd_server, SOMAXCONN) == -1)
 		SystemFatal("listen");
-    	
+
     	// Create the epoll file descriptor
     	epoll_fd = epoll_create(EPOLL_QUEUE_LEN);
-    	if (epoll_fd == -1) 
+    	if (epoll_fd == -1)
 		SystemFatal("epoll_create");
-    	
+
     	// Add the server socket to the epoll event loop
     	event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET;
     	event.data.fd = fd_server;
-    	if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, fd_server, &event) == -1) 
+    	if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, fd_server, &event) == -1)
 		SystemFatal("epoll_ctl");
-    	
+	int z = 0;
+	int firstRun = 0;
+	int modified = 0;
 	// Execute the epoll event loop
-    	while (TRUE) 
+	while (TRUE)
 	{
+		// printf("Starting iteration: %d\n", z);
+		// printf("Waiting epoll now\n");
 		//struct epoll_event events[MAX_EVENTS];
-		num_fds = epoll_wait (epoll_fd, events, EPOLL_QUEUE_LEN, -1);
-		if (num_fds < 0) 
-			SystemFatal ("Error in epoll_wait!");
 
-		for (i = 0; i < num_fds; i++) 
+		//first run
+		if (firstRun == 0)
 		{
-	    		// Case 1: Error condition
-	    		if (events[i].events & (EPOLLHUP | EPOLLERR)) 
-			{
-				fputs("epoll: EPOLLERR", stderr);
-				close(events[i].data.fd);
-				continue;
+			num_fds = epoll_wait (epoll_fd, events, EPOLL_QUEUE_LEN, -1);
+		}
+		else
+		{
+			//runs after the first connection
+			num_fds = epoll_wait (epoll_fd, events, EPOLL_QUEUE_LEN, 10000);
+		}
+		printf("%d\n", num_fds);
+
+		//If epoll timed out, change edge trigger to level trigger to flush out missed items. Reset at the end.
+		if(num_fds == 0)
+		{
+			printf("Timed out!!!\n");
+			event.events = EPOLLIN | EPOLLERR | EPOLLHUP;
+			event.data.fd = fd_server;
+			epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd_server, &event);
+			modified = 1;
+		}
+
+		if (num_fds < 0)
+		{
+			SystemFatal ("Error in epoll_wait!");
+			break;
+		}
+
+		for (i = 0; i < num_fds; i++)
+		{
+	    		// Case: Hang up condition Error condition
+	    		if (events[i].events & (EPOLLHUP))
+				{
+					fputs("epoll: EPOLLHUP", stderr);
+					send ((events[i].data.fd), "There was a HangUp, goodbye", BUFLEN, 0);
+					close(events[i].data.fd);
+					//clear the data when finished processesing;
+					events[i] = emptyEvent;
+					continue;
 	    		}
-	    		assert (events[i].events & EPOLLIN);
+
+				if (events[i].events & (EPOLLERR))
+				{
+					fputs("epoll: EPOLLERR", stderr);
+					//clear the data when finished processesing;
+					close(events[i].data.fd);
+					continue;
+	    		}
+	    		// assert (events[i].events & EPOLLIN);
 
 	    		// Case 2: Server is receiving a connection request
-	    		if (events[i].data.fd == fd_server) 
-			{
-				//socklen_t addr_size = sizeof(remote_addr);
-				fd_new = accept (fd_server, (struct sockaddr*) &remote_addr, &addr_size);
-				if (fd_new == -1) 
+	    		if (events[i].data.fd == fd_server)
 				{
-		    			if (errno != EAGAIN && errno != EWOULDBLOCK) 
+					//socklen_t addr_size = sizeof(remote_addr);
+					fd_new = accept (fd_server, (struct sockaddr*) &remote_addr, &addr_size);
+					if (fd_new == -1)
 					{
-						perror("accept");
-		    			}
-		    			continue;
+			    			if (errno != EAGAIN && errno != EWOULDBLOCK)
+						{
+							perror("accept");
+			    			}
+			    			continue;
+					}
+
+					// Make the fd_new non-blocking
+					if (fcntl (fd_new, F_SETFL, O_NONBLOCK | fcntl(fd_new, F_GETFL, 0)) == -1)
+						SystemFatal("fcntl");
+
+					// Add the new socket descriptor to the epoll loop
+    				event.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLEXCLUSIVE;
+					event.data.fd = fd_new;
+					if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, fd_new, &event) == -1)
+						SystemFatal ("epoll_ctl");
+
+					// printf(" Remote Address:  %s\n", inet_ntoa(remote_addr.sin_addr));
+					//clear the data when finished processesing;
+					events[i] = emptyEvent;
+					continue;
+	    		}
+				// pthread_create(&threadList[i], NULL, CheckSocket, events[i].data.fd);
+				// pthread_join(threadList[i]);
+				// printf("Split!");
+				if(events[i].events & (EPOLLIN && EPOLLOUT))
+				{
+					if (!ClearSocket(events[i].data.fd))
+						{
+							// epoll will remove the fd from its set
+							// automatically when the fd is closed
+
+							//Clean fd removal
+							epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, NULL);
+							close (events[i].data.fd);
+							//clear the data when finished processesing;
+							events[i] = emptyEvent;
+						}
 				}
+				// printf("Iteration: %d completed\n", z);
+				z += 1;
+			}
+			firstRun = -1;
 
-				// Make the fd_new non-blocking
-				if (fcntl (fd_new, F_SETFL, O_NONBLOCK | fcntl(fd_new, F_GETFL, 0)) == -1) 
-					SystemFatal("fcntl");
-				
-				// Add the new socket descriptor to the epoll loop
-				event.data.fd = fd_new;
-				if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, fd_new, &event) == -1) 
-					SystemFatal ("epoll_ctl");
-				
-				printf(" Remote Address:  %s\n", inet_ntoa(remote_addr.sin_addr));
-				continue;
-	    		}
-
-	    		// Case 3: One of the sockets has read data
-	    		if (!ClearSocket(events[i].data.fd)) 
+			//Reset epoll's Trigger
+			if(modified = 1)
 			{
-				// epoll will remove the fd from its set
-				// automatically when the fd is closed
-				close (events[i].data.fd);
-	    		}
-		}
+				event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET;
+				event.data.fd = fd_server;
+				epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd_server, &event);
+				modified = 0;
+				firstRun = 0;
+			}
     	}
 	close(fd_server);
 	exit (EXIT_SUCCESS);
 }
 
-
-static int ClearSocket (int fd) 
+static int ClearSocket (int fd)
 {
 	int	n, bytes_to_read;
-	char	*bp, buf[BUFLEN];
+	char *bp, buf[BUFLEN];
 
 	while (TRUE)
 	{
-		
+
 		bp = buf;
 		bytes_to_read = BUFLEN;
 		while ((n = recv (fd, bp, bytes_to_read, 0)) < BUFLEN)
@@ -185,19 +251,22 @@ static int ClearSocket (int fd)
 			bp += n;
 			bytes_to_read -= n;
 		}
-		printf ("sending:%s\n", buf);
-
-		send (fd, buf, BUFLEN, 0);
-		close (fd);
-		return TRUE;
+		if(buf[0] != '\0')
+		{
+			// printf ("sending:%s\n", buf);
+			send (fd, buf, BUFLEN, 0);
+			return TRUE;
+		}
+		else
+			break;
 	}
-	close(fd);
+	// close(fd);
 	return(0);
 
 }
 
 // Prints the error stored in errno and aborts the program.
-static void SystemFatal(const char* message) 
+static void SystemFatal(const char* message)
 {
     perror (message);
     exit (EXIT_FAILURE);
@@ -206,6 +275,6 @@ static void SystemFatal(const char* message)
 // close fd
 void close_fd (int signo)
 {
-        close(fd_server);
+    close(fd_server);
 	exit (EXIT_SUCCESS);
 }
