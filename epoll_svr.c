@@ -45,7 +45,7 @@
 #define FALSE 		0
 #define EPOLL_QUEUE_LEN	256
 #define BUFLEN		80
-#define SERVER_PORT	7001
+#define SERVER_PORT	7000
 
 //Globals
 int fd_server;
@@ -129,7 +129,7 @@ int main (int argc, char* argv[])
 		else
 		{
 			//runs after the first connection
-			num_fds = epoll_wait (epoll_fd, events, EPOLL_QUEUE_LEN, 10000);
+			num_fds = epoll_wait (epoll_fd, events, EPOLL_QUEUE_LEN, 1000);
 		}
 		printf("%d\n", num_fds);
 
@@ -137,10 +137,10 @@ int main (int argc, char* argv[])
 		if(num_fds == 0)
 		{
 			printf("Timed out!!!\n");
-			event.events = EPOLLIN | EPOLLERR | EPOLLHUP;
-			event.data.fd = fd_server;
-			epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd_server, &event);
-			modified = 1;
+		// 	event.events = EPOLLIN | EPOLLERR | EPOLLHUP;
+		// 	event.data.fd = fd_server;
+		// 	epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd_server, &event);
+		// 	modified = 1;
 		}
 
 		if (num_fds < 0)
@@ -152,23 +152,24 @@ int main (int argc, char* argv[])
 		for (i = 0; i < num_fds; i++)
 		{
 	    		// Case: Hang up condition Error condition
-	    		if (events[i].events & (EPOLLHUP))
+	    		if (events[i].events & (EPOLLHUP | EPOLLERR))
 				{
-					fputs("epoll: EPOLLHUP", stderr);
-					send ((events[i].data.fd), "There was a HangUp, goodbye", BUFLEN, 0);
+					fputs("epoll: EPOLLHUP | EPOLLERR\n", stderr);
+					// send ((events[i].data.fd), "There was a HangUp, goodbye", BUFLEN, 0);
 					close(events[i].data.fd);
 					//clear the data when finished processesing;
 					events[i] = emptyEvent;
 					continue;
 	    		}
-
-				if (events[i].events & (EPOLLERR))
-				{
-					fputs("epoll: EPOLLERR", stderr);
-					//clear the data when finished processesing;
-					close(events[i].data.fd);
-					continue;
-	    		}
+				//
+				// if (events[i].events & (EPOLLERR))
+				// {
+				// 	fputs("epoll: EPOLLERR\n", stderr);
+				// 	close(events[i].data.fd);
+				// 	//clear the data when finished processesing;
+				// 	events[i] = emptyEvent;
+				// 	continue;
+	    		// }
 	    		// assert (events[i].events & EPOLLIN);
 
 	    		// Case 2: Server is receiving a connection request
@@ -190,7 +191,7 @@ int main (int argc, char* argv[])
 						SystemFatal("fcntl");
 
 					// Add the new socket descriptor to the epoll loop
-    				event.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLEXCLUSIVE;
+    				event.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLET;
 					event.data.fd = fd_new;
 					if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, fd_new, &event) == -1)
 						SystemFatal ("epoll_ctl");
@@ -223,14 +224,14 @@ int main (int argc, char* argv[])
 			firstRun = -1;
 
 			//Reset epoll's Trigger
-			if(modified = 1)
-			{
-				event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET;
-				event.data.fd = fd_server;
-				epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd_server, &event);
-				modified = 0;
-				firstRun = 0;
-			}
+			// if(modified = 1)
+			// {
+			// 	event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET;
+			// 	event.data.fd = fd_server;
+			// 	epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd_server, &event);
+			// 	modified = 0;
+			// 	firstRun = 0;
+			// }
     	}
 	close(fd_server);
 	exit (EXIT_SUCCESS);
@@ -246,19 +247,40 @@ static int ClearSocket (int fd)
 
 		bp = buf;
 		bytes_to_read = BUFLEN;
-		while ((n = recv (fd, bp, bytes_to_read, 0)) < BUFLEN)
+		// while ((n = recv (fd, bp, bytes_to_read, 0)) < BUFLEN)
+		n = recv (fd, bp, bytes_to_read, 0);
+		// {
+		// 	bp += n;
+		// 	bytes_to_read -= n;
+		// }
+		if(errno == EAGAIN)
 		{
-			bp += n;
-			bytes_to_read -= n;
-		}
-		if(buf[0] != '\0')
-		{
-			// printf ("sending:%s\n", buf);
-			send (fd, buf, BUFLEN, 0);
-			return TRUE;
+			printf("EAGAIN\n");
+			//MORE TO READ, SEND BACK TO OUTER LOOP
+			errno = 0;
+			sleep(1);
+			continue;
 		}
 		else
-			break;
+		{
+			if(buf[0] != '\0')
+			{
+				// printf ("sending:%s\n", buf);
+				send (fd, buf, BUFLEN, 0);
+				return TRUE;
+			}
+			else
+				break;
+		}
+		// if (errno == EWOULDBLOCK)
+		// {
+		// 	errno = 0;
+		// 	printf("EWOULDBLOCK\n");
+		// }
+		// else
+		// {
+
+		// }
 	}
 	// close(fd);
 	return(0);
