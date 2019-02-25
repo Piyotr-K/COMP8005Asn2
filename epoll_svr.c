@@ -59,10 +59,12 @@ void close_fd (int);
 pthread_mutex_t tlock = PTHREAD_MUTEX_INITIALIZER;
 
 // Logging
-clock_t start;
 int requests_log[EPOLL_QUEUE_LEN] = {0};
-int client_port[EPOLL_QUEUE_LEN];
-unsigned long client_ip[EPOLL_QUEUE_LEN];
+unsigned short client_port[EPOLL_QUEUE_LEN];
+int clientNumber[EPOLL_QUEUE_LEN] = {0};
+struct in_addr client_ip[EPOLL_QUEUE_LEN], emptyInAddr;
+double startTimer[EPOLL_QUEUE_LEN];
+size_t dataTransfered[EPOLL_QUEUE_LEN] = {0};
 
 int main (int argc, char* argv[])
 {
@@ -70,12 +72,13 @@ int main (int argc, char* argv[])
 	int num_fds, fd_new, epoll_fd;
 	int port = SERVER_PORT;
 	int requests = 0;
+	int numOfClients = 0;
 
 	static struct epoll_event events[EPOLL_QUEUE_LEN], event, emptyEvent;
 	struct sockaddr_in addr, remote_addr;
 	struct sigaction act;
 
-    pthread_t threadList[EPOLL_QUEUE_LEN];
+    // pthread_t threadList[EPOLL_QUEUE_LEN];
 	socklen_t addr_size = sizeof(struct sockaddr_in);
 
 
@@ -190,6 +193,8 @@ int main (int argc, char* argv[])
 			    			continue;
 					}
 
+					numOfClients += 1;
+
 					// Make the fd_new non-blocking
 					if (fcntl (fd_new, F_SETFL, O_NONBLOCK | fcntl(fd_new, F_GETFL, 0)) == -1)
 						SystemFatal("fcntl");
@@ -203,8 +208,10 @@ int main (int argc, char* argv[])
 					// Logging requests
 					requests_log[fd_new]++;
 
-					client_ip[fd_new] = inet_ntoa(remote_addr.sin_addr);
-					client_port[fd_new] = ntohs(remote_addr.sin_port);
+					client_ip[fd_new] = remote_addr.sin_addr;
+					client_port[fd_new] = remote_addr.sin_port;
+					startTimer[fd_new] = clock();
+					clientNumber[fd_new] = numOfClients;
 
 					// printf(" Remote Address:  %s\n", inet_ntoa(remote_addr.sin_addr));
 					//clear the data when finished processesing;
@@ -222,6 +229,11 @@ int main (int argc, char* argv[])
 							// automatically when the fd is closed
 
 							//Clean fd removal
+							client_ip[events[i].data.fd] = emptyInAddr;
+							client_port[events[i].data.fd] = 0;
+							clientNumber[events[i].data.fd] = 0;
+							startTimer[events[i].data.fd] = 0;
+							dataTransfered[events[i].data.fd] = 0;
 							epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, NULL);
 							close (events[i].data.fd);
 							//clear the data when finished processesing;
@@ -251,6 +263,8 @@ static int ClearSocket (int fd)
 {
 	int	n, bytes_to_read;
 	char *bp, buf[BUFLEN];
+	clock_t end;
+	double cpu_time_used;
 
 	while (TRUE)
 	{
@@ -273,6 +287,7 @@ static int ClearSocket (int fd)
 
 			if(buf[0] != '\0')
 			{
+				dataTransfered[fd] += sizeof(buf);
 				send (fd, buf, BUFLEN, 0);
 				return TRUE;
 			}
@@ -282,7 +297,9 @@ static int ClearSocket (int fd)
 	}
 
 	// Request logging
-	fprintf(stderr, "Requests recorded for client[%s:%d]: %d\n",  client_ip[fd], client_port[fd], requests_log[fd]);
+	end = clock();
+	cpu_time_used = ((double) (end - startTimer[fd])) / CLOCKS_PER_SEC;
+	fprintf(stderr, "%d, %s:%d, %lf, %d, %d\n", clientNumber[fd], inet_ntoa(client_ip[fd]), ntohs(client_port[fd]), cpu_time_used, requests_log[fd], dataTransfered[fd]);
 	requests_log[fd] = 0;
 	return(0);
 
