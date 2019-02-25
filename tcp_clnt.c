@@ -46,6 +46,7 @@ void *ClntConnection(void *data);
 struct ConArgs
 {
     int port;
+    int numberOfPrints;
     char *host;
 };
 
@@ -55,6 +56,8 @@ int main(int argc, char **argv)
 {
     int i, n, bytes_to_read;
     int sd, port;
+    int printTimes;
+
     struct hostent *hp;
     struct sockaddr_in server;
     struct ConArgs connectionArgs;
@@ -79,13 +82,33 @@ int main(int argc, char **argv)
         port = atoi(argv[2]);
         numOfThreads = atoi(argv[3]);
         break;
+    case 5:
+        host = argv[1];
+        port = atoi(argv[2]);
+        printTimes = atoi(argv[3]);
+        numOfThreads = atoi(argv[4]);
+        break;
     default:
         fprintf(stderr, "Usage: %s host [port] [number of threads]\n", argv[0]);
         exit(1);
     }
     connectionArgs.host = host;
     connectionArgs.port = port;
+    connectionArgs.numberOfPrints = printTimes;
     argPT = &connectionArgs;
+
+    //Ask what to print and How many times
+    FILE *fp = fopen("Data.txt", "w");
+    if (fp == NULL)
+    {
+        fprintf(stderr, "Can't open file\n");
+        exit(1);
+    }
+
+    printf("Enter Your Data\n");
+    fgets(sbuf, BUFLEN, stdin);
+    fprintf(fp, "%s\n", sbuf);
+    fclose(fp);
 
     //Creates list of threads
     pthread_t threadList[numOfThreads];
@@ -102,6 +125,7 @@ int main(int argc, char **argv)
     {
         pthread_join(threadList[i], NULL);
     }
+
     printf("Done\n");
     return (0);
 }
@@ -109,8 +133,9 @@ int main(int argc, char **argv)
 void *ClntConnection(void *data)
 {
     struct ConArgs *connectionArgs = data;
-    int port = connectionArgs->port;
     char *host = connectionArgs->host;
+    int port = connectionArgs->port;
+    int printLoopValue = connectionArgs->numberOfPrints;
     int n, bytes_to_read, sd;
     struct hostent *hp;
     struct sockaddr_in server;
@@ -121,9 +146,6 @@ void *ClntConnection(void *data)
     pthread_mutex_lock(&lock);
 
     // Open the text file and read it for data for sending
-
-    //Ensure ulimit is a high value when testing: ulimit -n ####
-    FILE *fp = fopen("alice.txt", "r");
 
     // Create the socket
     if ((sd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
@@ -162,41 +184,52 @@ void *ClntConnection(void *data)
     //Finished Memory stuff, let threads send stuff now
     pthread_mutex_unlock(&lock);
 
-    while (fgets(sbuf, BUFLEN, fp) != 0)
+    int i = 0;
+
+    for (i = 0; i < printLoopValue; i++)
     {
-
-        // printf("Now sleeping\n");
-        // sleep(1);
-
-        //Get from file
-        printf("Transmit:\n");
-        printf("%s", sbuf);
-        write(sd, sbuf, BUFLEN);
-
-        //Set up receive
-        printf("Receive:\n");
-        bp = rbuf;
-        bytes_to_read = BUFLEN;
-
-        // client makes repeated calls to recv until no more data is expected to arrive.
-        n = 0;
-        while ((n = recv(sd, bp, bytes_to_read, 0)) < BUFLEN)
+        FILE *fp;
+        //Ensure ulimit is a high value when testing: ulimit -n ####
+        pthread_mutex_lock(&lock);
+        fp = fopen("Data.txt", "r");
+        pthread_mutex_unlock(&lock);
+        while (fgets(sbuf, BUFLEN, fp) != 0)
         {
-            bp += n;
-            bytes_to_read -= n;
-        }
-        printf("%s\n", rbuf);
-        fflush(stdout);
-    }
 
+            // printf("Now sleeping\n");
+            // sleep(1);
+
+            //Get from file
+            // printf("Transmit:\n");
+            // printf("%s", sbuf);
+            write(sd, sbuf, BUFLEN);
+
+            //Set up receive
+            // printf("Receive:\n");
+            bp = rbuf;
+            bytes_to_read = BUFLEN;
+
+            // client makes repeated calls to recv until no more data is expected to arrive.
+            n = 0;
+            while ((n = recv(sd, bp, bytes_to_read, 0)) < BUFLEN)
+            {
+                bp += n;
+                bytes_to_read -= n;
+            }
+            //printf("%s\n", rbuf);
+            fflush(stdout);
+        }
+
+        //Properly close file when finished
+        fclose(fp);
+    }
+    
     sbuf[0] = '\0';
 
     // printf("Finished with reading file, sending EOF\n");
     //Send last string with ending line
     write(sd, sbuf, BUFLEN);
 
-    //Properly close file when finished
-    fclose(fp);
     close(sd);
     // printf("%d done\n", pthread_self());
     return NULL;

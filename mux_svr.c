@@ -125,6 +125,7 @@ int main(int argc, char ** argv) {
             for (i = 0; i < FD_SETSIZE; i++)
                 if (client[i] < 0)
 				{
+                    requestedGenerated[i] += 1; // initial tcp
                     client[i] = new_sd; // save descriptor
                     portNum[i] = client_addr.sin_port; // saves the client's port number
                     ip_num[i] = client_addr.sin_addr; // save the client's ip address
@@ -162,12 +163,12 @@ int main(int argc, char ** argv) {
 					bp += n;
                     bytes_to_read -= n;
                 }
+                requestedGenerated[i] += 1;
 
                 //Connection should be closed when reaching EOF instead of when text is done being sent
                 if (buf[0] != '\0')
                 {
                     // printf("%s\n", buf);
-                    requestedGenerated[i] += 1;
                     dataTransfered[i] += sizeof(buf);
                     write(sockfd, buf, BUFLEN); // echo to client
                 }

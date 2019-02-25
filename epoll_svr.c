@@ -170,7 +170,7 @@ int main (int argc, char* argv[])
 	    		// Case: Hang up condition Error condition
 	    		if (events[i].events & (EPOLLHUP | EPOLLERR))
 				{
-					fputs("epoll: EPOLLHUP | EPOLLERR\n", stderr);
+					// fputs("epoll: EPOLLHUP | EPOLLERR\n", stderr);
 					// send ((events[i].data.fd), "There was a HangUp, goodbye", BUFLEN, 0);
 					close(events[i].data.fd);
 					//clear the data when finished processesing;
