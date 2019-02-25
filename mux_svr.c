@@ -36,7 +36,7 @@
 #include <time.h>
 
 #define SERVER_TCP_PORT 7001 // Default port
-# define BUFLEN 255 //Buffer length
+# define BUFLEN 80 //Buffer length
 # define TRUE 1
 # define LISTENQ 5
 # define MAXLINE 4096
@@ -47,6 +47,8 @@ static void SystemFatal(const char * );
 int main(int argc, char ** argv) {
     int i, maxi, nready, bytes_to_read, arg;
     int listen_sd, new_sd, sockfd, client_len, port, maxfd, client[FD_SETSIZE];
+
+    unsigned long ip_num[FD_SETSIZE]; // Saves ip address of the connected clients
     int portNum[FD_SETSIZE]; // Saves port numbers of the connected clients
     double startTimer[FD_SETSIZE]; // Saves start Timer of each of the clients
     int requestedGenerated[FD_SETSIZE];
@@ -125,6 +127,7 @@ int main(int argc, char ** argv) {
 				{
                     client[i] = new_sd; // save descriptor
                     portNum[i] = ntohs(client_addr.sin_port); // saves the client's port number
+                    ip_num[i] = inet_ntoa(client_addr.sin_addr); // save the client's ip address
                     startTimer[i] = clock();
                     clientNumber[i] = numOfClients;
                     break;
@@ -174,7 +177,7 @@ int main(int argc, char ** argv) {
                     cpu_time_used = ((double) (end - startTimer[i])) / CLOCKS_PER_SEC;
                     // printf("Connection #, Remote Address:Port Number, Time used, Requests Generated, Data Transfered\n");
                     // printf("====================================================\n");
-                    printf("%d, %s:%hu, %lf, %d, %d\n", clientNumber[i], inet_ntoa(client_addr.sin_addr), portNum[i], cpu_time_used, requestedGenerated[i], dataTransfered[i]);
+                    printf("%d, %s:%hu, %lf, %d, %d\n", clientNumber[i], ip_num[i], portNum[i], cpu_time_used, requestedGenerated[i], dataTransfered[i]);
                     close(sockfd);
                     FD_CLR(sockfd, &allset);
                     client[i] = -1;

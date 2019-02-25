@@ -123,7 +123,7 @@ void *ClntConnection(void *data)
     // Open the text file and read it for data for sending
 
     //Ensure ulimit is a high value when testing: ulimit -n ####
-    FILE *fp = fopen("ducks.txt", "r");
+    FILE *fp = fopen("alice.txt", "r");
 
     // Create the socket
     if ((sd = socket(AF_INET, SOCK_STREAM, 0)) == -1)

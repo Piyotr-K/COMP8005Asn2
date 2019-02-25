@@ -40,10 +40,11 @@
 #include <unistd.h>
 #include <signal.h>
 #include <pthread.h>
+#include <time.h>
 
 #define TRUE 		1
 #define FALSE 		0
-#define EPOLL_QUEUE_LEN	256
+#define EPOLL_QUEUE_LEN	30000
 #define BUFLEN		80
 #define SERVER_PORT	7000
 
@@ -55,16 +56,28 @@ static void SystemFatal (const char* message);
 static int ClearSocket (int fd);
 void close_fd (int);
 
+pthread_mutex_t tlock = PTHREAD_MUTEX_INITIALIZER;
+
+// Logging
+clock_t start;
+int requests_log[EPOLL_QUEUE_LEN] = {0};
+int client_port[EPOLL_QUEUE_LEN];
+unsigned long client_ip[EPOLL_QUEUE_LEN];
+
 int main (int argc, char* argv[])
 {
 	int i, arg;
 	int num_fds, fd_new, epoll_fd;
-	static struct epoll_event events[EPOLL_QUEUE_LEN], event, emptyEvent;
 	int port = SERVER_PORT;
+	int requests = 0;
+
+	static struct epoll_event events[EPOLL_QUEUE_LEN], event, emptyEvent;
 	struct sockaddr_in addr, remote_addr;
-	socklen_t addr_size = sizeof(struct sockaddr_in);
 	struct sigaction act;
+
     pthread_t threadList[EPOLL_QUEUE_LEN];
+	socklen_t addr_size = sizeof(struct sockaddr_in);
+
 
 	// set up the signal handler to close the server socket when CTRL-c is received
         act.sa_handler = close_fd;
@@ -131,16 +144,16 @@ int main (int argc, char* argv[])
 			//runs after the first connection
 			num_fds = epoll_wait (epoll_fd, events, EPOLL_QUEUE_LEN, 1000);
 		}
-		printf("%d\n", num_fds);
+		// printf("%d\n", num_fds);
 
 		//If epoll timed out, change edge trigger to level trigger to flush out missed items. Reset at the end.
 		if(num_fds == 0)
 		{
 			printf("Timed out!!!\n");
-		// 	event.events = EPOLLIN | EPOLLERR | EPOLLHUP;
-		// 	event.data.fd = fd_server;
-		// 	epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd_server, &event);
-		// 	modified = 1;
+			event.events = EPOLLIN | EPOLLERR | EPOLLHUP;
+			event.data.fd = fd_server;
+			epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd_server, &event);
+			modified = 1;
 		}
 
 		if (num_fds < 0)
@@ -161,22 +174,13 @@ int main (int argc, char* argv[])
 					events[i] = emptyEvent;
 					continue;
 	    		}
-				//
-				// if (events[i].events & (EPOLLERR))
-				// {
-				// 	fputs("epoll: EPOLLERR\n", stderr);
-				// 	close(events[i].data.fd);
-				// 	//clear the data when finished processesing;
-				// 	events[i] = emptyEvent;
-				// 	continue;
-	    		// }
-	    		// assert (events[i].events & EPOLLIN);
 
 	    		// Case 2: Server is receiving a connection request
 	    		if (events[i].data.fd == fd_server)
 				{
 					//socklen_t addr_size = sizeof(remote_addr);
 					fd_new = accept (fd_server, (struct sockaddr*) &remote_addr, &addr_size);
+
 					if (fd_new == -1)
 					{
 			    			if (errno != EAGAIN && errno != EWOULDBLOCK)
@@ -191,10 +195,16 @@ int main (int argc, char* argv[])
 						SystemFatal("fcntl");
 
 					// Add the new socket descriptor to the epoll loop
-    				event.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLET;
+    				event.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLEXCLUSIVE;
 					event.data.fd = fd_new;
 					if (epoll_ctl (epoll_fd, EPOLL_CTL_ADD, fd_new, &event) == -1)
 						SystemFatal ("epoll_ctl");
+
+					// Logging requests
+					requests_log[fd_new]++;
+
+					client_ip[fd_new] = inet_ntoa(remote_addr.sin_addr);
+					client_port[fd_new] = ntohs(remote_addr.sin_port);
 
 					// printf(" Remote Address:  %s\n", inet_ntoa(remote_addr.sin_addr));
 					//clear the data when finished processesing;
@@ -223,15 +233,15 @@ int main (int argc, char* argv[])
 			}
 			firstRun = -1;
 
-			//Reset epoll's Trigger
-			// if(modified = 1)
-			// {
-			// 	event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET;
-			// 	event.data.fd = fd_server;
-			// 	epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd_server, &event);
-			// 	modified = 0;
-			// 	firstRun = 0;
-			// }
+			// Reset epoll's Trigger
+			if(modified = 1)
+			{
+				event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET;
+				event.data.fd = fd_server;
+				epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd_server, &event);
+				modified = 0;
+				firstRun = 0;
+			}
     	}
 	close(fd_server);
 	exit (EXIT_SUCCESS);
@@ -247,12 +257,7 @@ static int ClearSocket (int fd)
 
 		bp = buf;
 		bytes_to_read = BUFLEN;
-		// while ((n = recv (fd, bp, bytes_to_read, 0)) < BUFLEN)
 		n = recv (fd, bp, bytes_to_read, 0);
-		// {
-		// 	bp += n;
-		// 	bytes_to_read -= n;
-		// }
 		if(errno == EAGAIN)
 		{
 			printf("EAGAIN\n");
@@ -263,26 +268,22 @@ static int ClearSocket (int fd)
 		}
 		else
 		{
+			// Request logging
+			requests_log[fd]++;
+
 			if(buf[0] != '\0')
 			{
-				// printf ("sending:%s\n", buf);
 				send (fd, buf, BUFLEN, 0);
 				return TRUE;
 			}
 			else
 				break;
 		}
-		// if (errno == EWOULDBLOCK)
-		// {
-		// 	errno = 0;
-		// 	printf("EWOULDBLOCK\n");
-		// }
-		// else
-		// {
-
-		// }
 	}
-	// close(fd);
+
+	// Request logging
+	fprintf(stderr, "Requests recorded for client[%s:%d]: %d\n",  client_ip[fd], client_port[fd], requests_log[fd]);
+	requests_log[fd] = 0;
 	return(0);
 
 }
