@@ -169,12 +169,12 @@ void *ClntConnection(void *data)
         // sleep(1);
 
         //Get from file
-        // printf("Transmit:\n");
-        // printf("%s", sbuf);
+        printf("Transmit:\n");
+        printf("%s", sbuf);
         write(sd, sbuf, BUFLEN);
 
         //Set up receive
-        // printf("Receive:\n");
+        printf("Receive:\n");
         bp = rbuf;
         bytes_to_read = BUFLEN;
 
@@ -185,8 +185,8 @@ void *ClntConnection(void *data)
             bp += n;
             bytes_to_read -= n;
         }
-        // printf("%s\n", rbuf);
-        // fflush(stdout);
+        printf("%s\n", rbuf);
+        fflush(stdout);
     }
 
     sbuf[0] = '\0';
