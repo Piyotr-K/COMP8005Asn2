@@ -24,6 +24,7 @@
 --	The program will accept TCP connections from multiple client machines.
 -- 	The program will read data from each client socket and simply echo it back.
 ---------------------------------------------------------------------------------------*/
+#include <pthread.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -43,25 +44,40 @@
 
 // Function Prototypes
 static void SystemFatal(const char * );
+void *processClients(void *data);
+
+//Struct for passing arguments to workers
+struct ConArgs
+{
+    int curCounter;
+    int *sockfd;
+    fd_set *rset;
+    fd_set *allset;
+};
+
+//Globals for workers
+pthread_mutex_t lock;
+int client[FD_SETSIZE];
+struct in_addr ip_num[FD_SETSIZE]; // Saves ip address of the connected clients
+unsigned short portNum[FD_SETSIZE]; // Saves port numbers of the connected clients
+double startTimer[FD_SETSIZE]; // Saves start Timer of each of the clients
+int requestedGenerated[FD_SETSIZE];
+size_t dataTransfered[FD_SETSIZE];
+int clientNumber[FD_SETSIZE];
 
 int main(int argc, char ** argv) {
-    int i, maxi, nready, bytes_to_read, arg;
-    int listen_sd, new_sd, sockfd, client_len, port, maxfd, client[FD_SETSIZE];
-
-    struct in_addr ip_num[FD_SETSIZE]; // Saves ip address of the connected clients
-    unsigned short portNum[FD_SETSIZE]; // Saves port numbers of the connected clients
-    double startTimer[FD_SETSIZE]; // Saves start Timer of each of the clients
-    int requestedGenerated[FD_SETSIZE];
-    size_t dataTransfered[FD_SETSIZE];
-    int clientNumber[FD_SETSIZE];
+    int i, maxi, nready, arg;
+    // int bytes_to_read;
+    int listen_sd, new_sd, sockfd, client_len, port, maxfd;
     int numOfClients = 0;
-    clock_t end;
+    // clock_t end;
     struct sockaddr_in server, client_addr;
-    char * bp, buf[BUFLEN];
-    ssize_t n;
+    // char * bp, buf[BUFLEN];
+    // ssize_t n;
     fd_set rset, allset;
-    char tmpc;
-    double cpu_time_used;
+    // char tmpc;
+    // double cpu_time_used;
+    struct ConArgs *argPT;
 
     switch (argc)
 	{
@@ -123,6 +139,8 @@ int main(int argc, char ** argv) {
             numOfClients += 1;
 
             for (i = 0; i < FD_SETSIZE; i++)
+            {
+                pthread_mutex_lock(&lock);
                 if (client[i] < 0)
 				{
                     requestedGenerated[i] += 1; // initial tcp
@@ -131,15 +149,20 @@ int main(int argc, char ** argv) {
                     ip_num[i] = client_addr.sin_addr; // save the client's ip address
                     startTimer[i] = clock();
                     clientNumber[i] = numOfClients;
+                    pthread_mutex_unlock(&lock);
                     break;
                 }
+                pthread_mutex_unlock(&lock);
+
+            }
             if (i == FD_SETSIZE)
 			{
                 printf("Too many clients\n");
                 exit(1);
             }
-
+            pthread_mutex_lock(&lock);
             FD_SET(new_sd, & allset); // add new descriptor to set
+            pthread_mutex_unlock(&lock);
             if (new_sd > maxfd)
                 maxfd = new_sd; // for select
 
@@ -150,51 +173,107 @@ int main(int argc, char ** argv) {
                 continue; // no more readable descriptors
         }
 
+        pthread_t threadList[maxi+1];
         for (i = 0; i <= maxi; i++) // check all clients for data
         {
             if ((sockfd = client[i]) < 0)
                 continue;
-
             if (FD_ISSET(sockfd, & rset)) {
-                bp = buf;
-                bytes_to_read = BUFLEN;
-                while ((n = read(sockfd, bp, bytes_to_read)) > 0)
-                {
-					bp += n;
-                    bytes_to_read -= n;
-                }
-                requestedGenerated[i] += 1;
+                //create here
+                struct ConArgs connectionArgs;
+                connectionArgs.curCounter = i;
+                connectionArgs.rset = &rset;
+                connectionArgs.allset = &allset;
+                connectionArgs.sockfd = &sockfd;
+                argPT = &connectionArgs;
 
-                //Connection should be closed when reaching EOF instead of when text is done being sent
-                if (buf[0] != '\0')
-                {
-                    // printf("%s\n", buf);
-                    dataTransfered[i] += sizeof(buf);
-                    write(sockfd, buf, BUFLEN); // echo to client
-                }
-                else
-                {
-                    end = clock();
-                    cpu_time_used = ((double) (end - startTimer[i])) / CLOCKS_PER_SEC;
-                    // printf("Connection #, Remote Address:Port Number, Time used, Requests Generated, Data Transfered\n");
-                    // printf("====================================================\n");
-                    printf("%d, %s:%hu, %lf, %d, %d\n", clientNumber[i], inet_ntoa(ip_num[i]), ntohs(portNum[i]), cpu_time_used, requestedGenerated[i], dataTransfered[i]);
-                    close(sockfd);
-                    FD_CLR(sockfd, &allset);
-                    client[i] = -1;
-                    portNum[i] = 0;
-                    startTimer[i] = 0;
-                    requestedGenerated[i] = 0;
-                    dataTransfered[i] = 0;
-                    clientNumber[i] = -1;
-                }
+                pthread_create(&threadList[i], NULL, processClients, (void *) argPT);
 
+                //If the number of loops end, stop unecessary checks
                 if (--nready <= 0)
-                    break; // no more readable descriptors
+                break; // no more readable descriptors
+            }
+        }
+        for (i = 0; i <= maxi; i++)
+        {
+            if ((sockfd = client[i]) < 0)
+                continue;
+            //For each, do thread join if there was an event here.
+            if (FD_ISSET(sockfd, & rset)) {
+                pthread_join(threadList[i], NULL);
             }
         }
     }
     return (0);
+}
+
+void *processClients(void *data)
+{
+    pthread_mutex_lock(&lock);
+    struct ConArgs *connectionArgs = data;
+    int i = connectionArgs->curCounter;
+    int sockfd = *(connectionArgs->sockfd);
+    // fd_set rset = *(connectionArgs->rset);
+    fd_set allset = *(connectionArgs->allset);
+    int bytes_to_read, n;
+    char * bp, buf[BUFLEN];
+    clock_t end;
+    double cpu_time_used;
+
+    if(client[i] == 1)
+    {
+        printf("I am two");
+    }
+    pthread_mutex_unlock(&lock);
+
+    //multi thread here
+    bp = buf;
+    bytes_to_read = BUFLEN;
+
+
+    // printf("Read loop: %d\n", pthread_self());
+    while ((n = read(sockfd, bp, bytes_to_read)) > 0)
+    {
+        bp += n;
+        bytes_to_read -= n;
+        // printf("buf: %s from %d\n", buf, pthread_self);
+    }
+    printf("%d, %s:%hu received %s \n", clientNumber[i], inet_ntoa(ip_num[i]), ntohs(portNum[i]), buf);
+    // printf("Finished read loop: %d\n", pthread_self());
+    pthread_mutex_lock(&lock);
+    requestedGenerated[i] += 1;
+    pthread_mutex_unlock(&lock);
+    //Connection should be closed when reaching EOF instead of when text is done being sent
+
+    if (buf[1] != '\0')
+    {
+        // printf("%s\n", buf);
+        pthread_mutex_lock(&lock);
+        dataTransfered[i] += sizeof(buf);
+        printf("%d, %s:%hu, sending\n", clientNumber[i], inet_ntoa(ip_num[i]), ntohs(portNum[i]));
+        write(sockfd, buf, BUFLEN); // echo to client
+        pthread_mutex_unlock(&lock);
+    }
+    else
+    {
+        pthread_mutex_lock(&lock);
+        end = clock();
+        cpu_time_used = ((double) (end - startTimer[i])) / CLOCKS_PER_SEC;
+        // printf("Connection #, Remote Address:Port Number, Time used, Requests Generated, Data Transfered\n");
+        // printf("====================================================\n");
+        printf("%d, %s:%hu, %lf, %d, %ld done\n", clientNumber[i], inet_ntoa(ip_num[i]), ntohs(portNum[i]), cpu_time_used, requestedGenerated[i], dataTransfered[i]);
+        close(sockfd);
+        FD_CLR(sockfd, &allset);
+        client[i] = -1;
+        portNum[i] = 0;
+        startTimer[i] = 0;
+        requestedGenerated[i] = 0;
+        dataTransfered[i] = 0;
+        clientNumber[i] = -1;
+        pthread_mutex_unlock(&lock);
+    }
+
+    return NULL;
 }
 
 // Prints the error stored in errno and aborts the program.

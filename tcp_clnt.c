@@ -116,7 +116,7 @@ int main(int argc, char **argv)
     //Create # of clients
     for (i = 0; i < numOfThreads; i++)
     {
-        sleep(0.1);
+        // sleep(0.1);
         pthread_create(&threadList[i], NULL, ClntConnection, (void *)argPT);
     }
 
@@ -200,12 +200,12 @@ void *ClntConnection(void *data)
             // sleep(1);
 
             //Get from file
-            // printf("Transmit:\n");
-            // printf("%s", sbuf);
+            printf("Transmit:\n");
+            printf("%s", sbuf);
             write(sd, sbuf, BUFLEN);
 
             //Set up receive
-            // printf("Receive:\n");
+            printf("Receive:\n");
             bp = rbuf;
             bytes_to_read = BUFLEN;
 
@@ -216,21 +216,21 @@ void *ClntConnection(void *data)
                 bp += n;
                 bytes_to_read -= n;
             }
-            //printf("%s\n", rbuf);
+            printf("%s\n", rbuf);
             fflush(stdout);
         }
 
         //Properly close file when finished
         fclose(fp);
     }
-    
-    sbuf[0] = '\0';
+
+    sbuf[1] = '\0';
 
     // printf("Finished with reading file, sending EOF\n");
     //Send last string with ending line
     write(sd, sbuf, BUFLEN);
 
-    close(sd);
+    // close(sd);
     // printf("%d done\n", pthread_self());
     return NULL;
 }
