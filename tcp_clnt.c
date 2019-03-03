@@ -107,7 +107,7 @@ int main(int argc, char **argv)
 
     printf("Enter Your Data\n");
     fgets(sbuf, BUFLEN, stdin);
-    fprintf(fp, "%s\n", sbuf);
+    fprintf(fp, "%s", sbuf);
     fclose(fp);
 
     //Creates list of threads
@@ -132,6 +132,7 @@ int main(int argc, char **argv)
 
 void *ClntConnection(void *data)
 {
+    // pthread_detach(pthread_self());
     struct ConArgs *connectionArgs = data;
     char *host = connectionArgs->host;
     int port = connectionArgs->port;
@@ -200,12 +201,10 @@ void *ClntConnection(void *data)
             // sleep(1);
 
             //Get from file
-            // printf("Transmit:\n");
-            // printf("%s", sbuf);
+            printf("%d, Transmitting: %s\n", pthread_self(), sbuf);
             write(sd, sbuf, BUFLEN);
 
             //Set up receive
-            // printf("Receive:\n");
             bp = rbuf;
             bytes_to_read = BUFLEN;
 
@@ -216,21 +215,21 @@ void *ClntConnection(void *data)
                 bp += n;
                 bytes_to_read -= n;
             }
-            //printf("%s\n", rbuf);
-            fflush(stdout);
+            printf("%d, Received: %s\n", pthread_self(), rbuf);
+            // fflush(stdout);
         }
 
         //Properly close file when finished
         fclose(fp);
     }
-    
+
     sbuf[0] = '\0';
 
     // printf("Finished with reading file, sending EOF\n");
     //Send last string with ending line
     write(sd, sbuf, BUFLEN);
 
-    close(sd);
+    // close(sd);
     // printf("%d done\n", pthread_self());
     return NULL;
 }
