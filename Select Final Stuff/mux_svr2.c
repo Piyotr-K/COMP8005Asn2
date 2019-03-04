@@ -62,8 +62,8 @@ struct clientArgs
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
-int requestsGenerated[FD_SETSIZE] = {0};
-size_t dataTransfered[FD_SETSIZE] = {0};
+int requestsGenerated[FD_SETSIZE];
+size_t dataTransfered[FD_SETSIZE];
 int client[FD_SETSIZE];
 
 int main(int argc, char ** argv) {
@@ -154,10 +154,10 @@ int main(int argc, char ** argv) {
                 if (client[i] < 0)
 				{
                     client[i] = new_sd; // save descriptor
-                    portNum[i] = client_addr.sin_port; // saves the client's port number
-                    ip_num[i] = client_addr.sin_addr; // save the client's ip address
-                    startTimer[i] = clock();
-                    clientNumber[i] = numOfClients;
+                    portNum[new_sd] = client_addr.sin_port; // saves the client's port number
+                    ip_num[new_sd] = client_addr.sin_addr; // save the client's ip address
+                    startTimer[new_sd] = clock();
+                    clientNumber[new_sd] = numOfClients;
                     break;
                 }
             if (i == FD_SETSIZE)
@@ -196,10 +196,10 @@ int main(int argc, char ** argv) {
                 clientArguments.loopIteration = i;
                 clientArguments.allSetPT = &allset;
 
-                clientArguments.clientIP = ip_num[i];
-                clientArguments.clientPort = portNum[i];
-                clientArguments.startTimer = startTimer[i];
-                clientArguments.clientNumber = clientNumber[i];
+                clientArguments.clientIP = ip_num[sockfd];
+                clientArguments.clientPort = portNum[sockfd];
+                clientArguments.startTimer = startTimer[sockfd];
+                clientArguments.clientNumber = clientNumber[sockfd];
 
                 argsPT = &clientArguments;
 
@@ -241,7 +241,9 @@ void* threadFunction(void* data)
     char * bp, buf[BUFLEN];
     clock_t end;
     double cpu_time_used;
-    int n, s, endRequestsGenerated, endDataTransfered, bytes_to_read;
+    int n, s, bytes_to_read;
+    int endDataTransfered = 0;
+    int endRequestsGenerated = 0;
     // int counter = 0;
     while(1)
     {
@@ -250,9 +252,9 @@ void* threadFunction(void* data)
 
         //Sets up buffer lengths
         bytes_to_read = BUFLEN;
-        pthread_mutex_lock(&lock);
+        // pthread_mutex_lock(&lock);
         n = recv(sockfd, bp, bytes_to_read, 0);
-        pthread_mutex_unlock(&lock);
+        // pthread_mutex_unlock(&lock);
         if(errno == EAGAIN)
         {
             // if (counter > 3)
@@ -263,15 +265,18 @@ void* threadFunction(void* data)
             errno = 0;
             // counter++;
             // sleep(0.1);
+            pthread_mutex_lock(&lock);
+            requestsGenerated[sockfd] += 1;
+            pthread_mutex_unlock(&lock);
             printf("%d, %d EAGAIN\n", sockfd, pthread_self());
             break;
         }
         else
         {
             //mutex lock to ensure handling on variable for number of requests
-            // pthread_mutex_lock(&lock);
-            // requestsGenerated[outerCounter] += 1;
-            // pthread_mutex_unlock(&lock);
+            pthread_mutex_lock(&lock);
+            requestsGenerated[sockfd] += 1;
+            pthread_mutex_unlock(&lock);
 
             //Connection should be closed when reaching EOF instead of when text is done being sent
 
@@ -280,10 +285,10 @@ void* threadFunction(void* data)
             {
                 //mutex lock to ensure handling on variable for data transfered
                 // pthread_mutex_lock(&lock);
-                // dataTransfered[outerCounter] += sizeof(buf);
                 // printf("%s:%hu send: %s\n", inet_ntoa(ip_num), ntohs(clientPort), buf);
                 // pthread_mutex_unlock(&lock);
                 pthread_mutex_lock(&lock);
+                dataTransfered[sockfd] += sizeof(buf);
                 printf("%d, %d ECHOING: %s\n", sockfd, pthread_self(), buf);
                 write(sockfd, buf, BUFLEN); // echo to client
                 pthread_mutex_unlock(&lock);
@@ -294,9 +299,11 @@ void* threadFunction(void* data)
                 end = clock();
             	cpu_time_used = ((double) (end - startTimer)) / CLOCKS_PER_SEC;
                 pthread_mutex_lock(&lock);
+                endRequestsGenerated = requestsGenerated[sockfd];
+                endDataTransfered = dataTransfered[sockfd];
                 printf("%d, %d FINISHING\n", sockfd, pthread_self());
                 FILE *fp = fopen("Server.csv", "a");
-                fprintf(fp, "%d, %s:%d, %lf, %d, %d\n", clientNumber, inet_ntoa(ip_num), ntohs(clientPort), cpu_time_used);
+                fprintf(fp, "%d, %s:%d, %lf, %d, %d\n", clientNumber, inet_ntoa(ip_num), ntohs(clientPort), cpu_time_used, endRequestsGenerated, endDataTransfered);
                 fclose(fp);
                 close(sockfd);
                 FD_CLR(sockfd, allSetPT);

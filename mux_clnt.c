@@ -36,7 +36,6 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sched.h>
-#include <time.h>
 
 // Function Prototypes
 void *ClntConnection(void *data);
@@ -50,10 +49,9 @@ struct ConArgs
     int port;
     int numberOfPrints;
     char *host;
-    int clientNumber;
 };
 
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t lock;
 
 int main(int argc, char **argv)
 {
@@ -98,6 +96,7 @@ int main(int argc, char **argv)
     connectionArgs.host = host;
     connectionArgs.port = port;
     connectionArgs.numberOfPrints = printTimes;
+    argPT = &connectionArgs;
 
     //Ask what to print and How many times
     FILE *fp = fopen("Data.txt", "w");
@@ -118,8 +117,7 @@ int main(int argc, char **argv)
     //Create # of clients
     for (i = 0; i < numOfThreads; i++)
     {
-        connectionArgs.clientNumber = i;
-        argPT = &connectionArgs;
+        sleep(0.1);
         pthread_create(&threadList[i], NULL, ClntConnection, (void *)argPT);
     }
 
@@ -139,18 +137,11 @@ void *ClntConnection(void *data)
     char *host = connectionArgs->host;
     int port = connectionArgs->port;
     int printLoopValue = connectionArgs->numberOfPrints;
-    int clientNumber = connectionArgs->clientNumber;
     int n, bytes_to_read, sd;
     struct hostent *hp;
     struct sockaddr_in server;
     char *bp, rbuf[BUFLEN], sbuf[BUFLEN], **pptr, *sptr;
     char str[16];
-    int numberOfRequests = 0;
-    size_t dataTransfered = 0;
-
-    clock_t start, end;
-    double cpu_time_used;
-    start = clock();
 
     //Mutex lock important Memory functions to prevent segmentation faults
     pthread_mutex_lock(&lock);
@@ -210,15 +201,13 @@ void *ClntConnection(void *data)
             // sleep(1);
 
             //Get from file
-            // printf("Transmit:\n");
-            // printf("%s", sbuf);
+            printf("Transmit:\n");
+            printf("%s", sbuf);
             write(sd, sbuf, BUFLEN);
-            numberOfRequests++;
-            dataTransfered += sizeof(sbuf);
             sched_yield();
 
             //Set up receive
-            // printf("Receive:\n");
+            printf("Receive:\n");
             bp = rbuf;
             bytes_to_read = BUFLEN;
 
@@ -229,10 +218,8 @@ void *ClntConnection(void *data)
                 bp += n;
                 bytes_to_read -= n;
             }
-            dataTransfered += sizeof(rbuf);
-            numberOfRequests++;
             sched_yield();
-            // printf("%s\n", rbuf);
+            printf("%s\n", rbuf);
             fflush(stdout);
         }
 
@@ -246,21 +233,11 @@ void *ClntConnection(void *data)
     //Send last string with ending line
     sched_yield();
     write(sd, sbuf, BUFLEN);
-    numberOfRequests++;
-    dataTransfered += sizeof(sbuf);
     // while ((n = recv(sd, bp, bytes_to_read, 0)) < BUFLEN)
     // {
     //     bp += n;
     //     bytes_to_read -= n;
     // }
-    end = clock();
-    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    pthread_mutex_lock(&lock);
-    FILE *logFile = fopen("ClientLog.txt", "a");
-    fprintf(logFile, "%d, %d, %d, %lf\n", pthread_self(), numberOfRequests, dataTransfered, cpu_time_used);
-    fclose(logFile);
-    pthread_mutex_unlock(&lock);
-
     close(sd);
     // printf("%d done\n", pthread_self());
     return NULL;
